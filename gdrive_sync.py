@@ -7,20 +7,23 @@ import stock_collector
 
 # Configuration
 # These will be set in GitHub Secrets
-SERVICE_ACCOUNT_JSON = os.environ.get('GDRIVE_CREDENTIALS') 
+TOKEN_JSON_STR = os.environ.get('GDRIVE_TOKEN') 
 FOLDER_ID = os.environ.get('GDRIVE_FOLDER_ID')
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
 def authenticate_drive():
-    """Authenticates using Service Account Key from Environment Variable."""
-    if not SERVICE_ACCOUNT_JSON:
-        print("Error: GDRIVE_CREDENTIALS environment variable not set.")
+    """Authenticates using OAuth Token from Environment Variable."""
+    if not TOKEN_JSON_STR:
+        print("Error: GDRIVE_TOKEN environment variable not set.")
         return None
     
     try:
-        # If the secret is the raw JSON string
-        creds_dict = json.loads(SERVICE_ACCOUNT_JSON)
-        creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+        # Load the token data
+        token_info = json.loads(TOKEN_JSON_STR)
+        
+        from google.oauth2.credentials import Credentials
+        creds = Credentials.from_authorized_user_info(token_info, SCOPES)
+        
         return build('drive', 'v3', credentials=creds)
     except Exception as e:
         print(f"Authentication failed: {e}")
@@ -97,18 +100,28 @@ def upload_files(service):
 def main():
     service = authenticate_drive()
     if not service:
-        print("Skipping Drive Sync (Running purely local or Auth failed).")
-        # Still run the collector even if Drive fails, or maybe exit? 
-        # For now, let's run collector so at least local runner generates data (though it will be lost if not uploaded)
-    else:
-        # 1. Download existing history
-        download_files(service)
+        print("CRITICAL ERROR: Google Drive Authentication Failed.")
+        print("Please check the 'GDRIVE_TOKEN' secret in GitHub Settings.")
+        import sys
+        sys.exit(1)
+    
+    # 1. Download existing history
+    download_files(service)
     
     # 2. Run the collector
     print("\n--- Running Stock Collector ---\n")
     stock_collector.main()
     print("\n--- Collector Finished ---\n")
-    
+
+    # DEBUG: List all files generated
+    print("DEBUG: Listing files in data_ist:")
+    if os.path.exists(stock_collector.DATA_DIR):
+        for root, dirs, files in os.walk(stock_collector.DATA_DIR):
+            for file in files:
+                print(f"  Found: {os.path.join(root, file)}")
+    else:
+        print(f"  ERROR: Directory {stock_collector.DATA_DIR} does NOT exist.")
+
     if service:
         # 3. Upload updated data
         upload_files(service)

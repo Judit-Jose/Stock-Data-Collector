@@ -9,3 +9,7 @@ __pycache__/
 
 # Environment variables / potentially sensitive
 .env
+credentials.json
+
+credentials.json
+
