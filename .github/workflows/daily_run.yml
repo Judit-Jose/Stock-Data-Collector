@@ -1,0 +1,24 @@
+name: Daily Stock Data Collection
+on:
+  schedule:
+    - cron: '45 15 * * *'
+  workflow_dispatch:
+jobs:
+  collect-and-sync:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install yfinance pandas google-api-python-client google-auth
+    - name: Run Stock Collector with Drive Sync
+      env:
+        GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
+        GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+      run: python gdrive_sync.py
